@@ -255,6 +255,7 @@ if CLIENT then
             -- GUImsgBox.InnerFrame.RectTransform.MinSize = Point(0, Int32(contentHeight / GUIpermissionArea.RectTransform.RelativeSize.Y / GUImsgBox.Content.RectTransform.RelativeSize.Y))
         end
 
+        if string.find(tostring(GUIPermsTextBox.Text), PermStr) then return end
         local permissionLines = {}
         local added = false
         for line in string.gmatch(tostring(GUIPermsTextBox.Text), "[^\r\n]+") do
@@ -312,10 +313,8 @@ if CLIENT then
         local changed = state ~= ((AccountsWithCustomPermission[accid] ~= nil) or Game.Client.HasPermission(ClientPermissions.All))
         if state then
             AccountsWithCustomPermission[accid] = FindClient(accid) and FindClient(accid).Name or "?"
-            changed = true
         else
             AccountsWithCustomPermission[accid] = nil
-            changed = true
         end
 
         if changed then
@@ -324,10 +323,10 @@ if CLIENT then
             for identifier in Game.Client.permittedConsoleCommands do
                 table.insert(augTable,identifier)
             end
-            table.insert(augTable,Identifier("dummy"))
+            table.insert(augTable,Identifier(" "))
             
             Game.Client.SetMyPermissions(Game.Client.permissions, augTable)
-            Game.Client.permittedConsoleCommands.Remove(Identifier("dummy"))
+            Game.Client.permittedConsoleCommands.Remove(Identifier(" "))
         end
     end)
 end
@@ -669,7 +668,6 @@ local lastPicker = nil
     end, Hook.HookMethodType.Before)
 
 
-
     Hook.Patch("WiringPerms_saveperms", 'Barotrauma.Networking.ServerSettings', 'SaveClientPermissions', function(instance, ptable)
         if File.Exists(Game.ServerSettings.ClientPermissionsFile) then
             local PermissionsDoc = XDocument.Load(Game.ServerSettings.ClientPermissionsFile)
@@ -688,8 +686,6 @@ local lastPicker = nil
         return
     end, Hook.HookMethodType.After)
 
-
-
     Hook.Patch("WiringPerms_loadperms", 'Barotrauma.Networking.ServerSettings', 'LoadClientPermissions', function(instance, ptable)
         AccountsWithCustomPermission = {}
 
@@ -698,16 +694,18 @@ local lastPicker = nil
 
             for clientElement in PermissionsDoc.Root.Elements() do
                 local permissions = clientElement.GetAttributeString("permissions")
-                if 
-                    string.find(clientElement.GetAttributeString("permissions"), "All") or
-                    string.find(clientElement.GetAttributeString("permissions"), CustomPermission)
-                then
+                if string.find(permissions, "All") or string.find(permissions, CustomPermission) then
                     AccountsWithCustomPermission[clientElement.GetAttributeString("accountid")] = clientElement.GetAttributeString("name")
+                    -- delete custom permissions from perms config file before game sees it 
+                    -- or game gonna throw a fit and delete all permissions
+
+                    local newpermissionStr = string.gsub(permissions, ", " .. CustomPermission, "")
+                    clientElement.SetAttributeValue("permissions", newpermissionStr)
                 end
             end
 
             PermissionsDoc.Save(Game.ServerSettings.ClientPermissionsFile)
         end
         return
-    end, Hook.HookMethodType.After)
+    end, Hook.HookMethodType.Before)
 end
