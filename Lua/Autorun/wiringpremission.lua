@@ -40,9 +40,9 @@ AccountsWithCustomPermission = {
 --All of these lines are for console so no localization for them
 local NoAccessStr = "You do not have rewiring permissions"
 local GivePermissionStr = "Granted ChangeWiring permissions to "
-local GivePermissionAllStr = "Granted All permissions to "
+--local GivePermissionAllStr = "Granted All permissions to "
 local RevokePermissionStr = "Revoked ChangeWiring permissions from "
-local RevokePermissionAllStr = "Revoked All permissions from "
+--local RevokePermissionAllStr = "Revoked All permissions from "
 local CantRevokeOwnerStr = "Cannot revoke permissions from the server owner!"
 local ChangeWiringPermissionStr = " - " .. CustomPermission
 local PermStr = tostring(TextManager.Get("clientpermission." .. string.lower(CustomPermission)))
@@ -635,7 +635,7 @@ local lastPicker = nil
 
                 if perm == string.lower(CustomPermission) then
                     ptable.PreventExecution = true
-                    local GivePermissionMsg = ChatMessage.Create("", GivePermissionStr .. targetclient.Name  .. ".", ChatMessageType.Console, nil, nil, nil, Color.White)
+                    local GivePermissionMsg = ChatMessage.Create("", GivePermissionStr .. tostring(targetclient.Name)  .. ".", ChatMessageType.Console, nil, nil, nil, Color.White)
                     Game.Server.SendDirectChatMessage(GivePermissionMsg, ptable["client"])
                 end
 
@@ -655,7 +655,7 @@ local lastPicker = nil
                 
                 if perm == string.lower(CustomPermission) then
                     ptable.PreventExecution = true
-                    local RevokePermissionMsg = ChatMessage.Create("", RevokePermissionMsg .. targetclient.Name  .. ".", ChatMessageType.Console, nil, nil, nil, Color.White)
+                    local RevokePermissionMsg = ChatMessage.Create("", RevokePermissionStr .. tostring(targetclient.Name)  .. ".", ChatMessageType.Console, nil, nil, nil, Color.White)
                     Game.Server.SendDirectChatMessage(RevokePermissionMsg, ptable["client"])
                 end
                 
