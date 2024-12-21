@@ -551,6 +551,7 @@ if SERVER then
                 else
                     Game.Log(tostring(client.Name) .. " attempted to change propery " .. tostring(property.Name) .. " of " .. tostring(item), ServerLogMessageType.Wiring)
                 end
+                return true
             end
         end
         return
