@@ -561,7 +561,8 @@ local lastPicker = nil
 
     Hook.Patch("WiringPerms_deattach", 'Barotrauma.Items.Components.Pickable', 'Pick', function(instance, ptable)
         local picker = ptable["picker"]
-        if picker.IsPlayer then
+        if not picker.IsPlayer then return end
+        if instance.IsAttached and instance.item.Prefab.Category == MapEntityCategory.Electrical then
             client = FindClient(picker.ID)
             if (not client) or (HasWiringPerms(client)) then return end
             instance.StopPicking(picker)
