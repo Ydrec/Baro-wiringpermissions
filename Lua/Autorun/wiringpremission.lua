@@ -324,6 +324,8 @@ if CLIENT then
         end
 
         --print(tostring(Game.Client.MyClient.AccountId)," % ", accid)
+        --print(Game.Client.MyClient.AccountId)
+        if not Game.Client or not Game.Client.MyClient then return end
         if changed and tostring(Game.Client.MyClient.AccountId) == accid then
             --make game show new permissions message by faking a command as permissions themselves are immutable
             local augTable = {}
@@ -371,8 +373,7 @@ if SERVER then
         "System.Boolean"
     })
 
-    --explicit load in case of reloadlua
-    Game.ServerSettings.LoadClientPermissions()
+
 
     local function SendPermissionUpdate(targetclient, reciverclient)
         local msg = Networking.Start("WiringPerms_UpdatePermission")
@@ -725,9 +726,9 @@ local lastPicker = nil
                 local permissions = clientElement.GetAttributeString("permissions")
                 if string.find(permissions, "All") or string.find(permissions, CustomPermission) then
                     AccountsWithCustomPermission[clientElement.GetAttributeString("accountid")] = clientElement.GetAttributeString("name")
+
                     -- delete custom permissions from perms config file before game sees it 
                     -- or game gonna throw a fit and delete all permissions
-
                     local newpermissionStr = string.gsub(permissions, ", " .. CustomPermission, "")
                     clientElement.SetAttributeValue("permissions", newpermissionStr)
                 end
@@ -744,5 +745,8 @@ local lastPicker = nil
     Hook.Add("stop", "WiringPerms_luastop", function ()
         Game.ServerSettings.SaveClientPermissions()
     end)
+
+    --explicit load in case of reloadlua
+    Game.ServerSettings.LoadClientPermissions()
 end
 
