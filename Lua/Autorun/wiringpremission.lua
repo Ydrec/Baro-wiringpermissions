@@ -38,16 +38,18 @@ AccountsWithCustomPermission = {
 
 
 --All of these lines are for console so no localization for them
-local NoAccessStr = "You do not have wiring permissions"
 local GivePermissionStr = "Granted ChangeWiring permissions to "
 --local GivePermissionAllStr = "Granted All permissions to "
 local RevokePermissionStr = "Revoked ChangeWiring permissions from "
 --local RevokePermissionAllStr = "Revoked All permissions from "
 local CantRevokeOwnerStr = "Cannot revoke permissions from the server owner!"
 local ChangeWiringPermissionStr = " - " .. CustomPermission
-local PermStr = tostring(TextManager.Get("clientpermission." .. string.lower(CustomPermission)))
 
-local NoAccessMsg = ChatMessage.Create("", NoAccessStr, ChatMessageType.Server, nil, nil, nil, Color.Red)
+local PermLocStr = TextManager.Get("clientpermission." .. string.lower(CustomPermission))
+local PermDescriptionLocStr = TextManager.Get("clientpermission." .. string.lower(CustomPermission) .. ".description")
+local NoAccessLocStr = TextManager.Get("clientpermission." .. string.lower(CustomPermission) .. ".noaccessmsg")
+
+local NoAccessMsg = ChatMessage.Create("", NoAccessLocStr.Value, ChatMessageType.Server, nil, nil, nil, Color.Red)
 local CantRevokeOwnerMsg = ChatMessage.Create("", CantRevokeOwnerStr, ChatMessageType.Console, nil, nil, nil, Color.Red)
 local ChangeWiringPermissionMsg = ChatMessage.Create("", ChangeWiringPermissionStr, ChatMessageType.Console, nil, nil, nil, Color.White)
 
@@ -255,14 +257,14 @@ if CLIENT then
             -- GUImsgBox.InnerFrame.RectTransform.MinSize = Point(0, Int32(contentHeight / GUIpermissionArea.RectTransform.RelativeSize.Y / GUImsgBox.Content.RectTransform.RelativeSize.Y))
         end
 
-        if string.find(tostring(GUIPermsTextBox.Text), PermStr) then return end
+        if string.find(tostring(GUIPermsTextBox.Text), PermLocStr.Value) then return end
         local permissionLines = {}
         local added = false
         for line in string.gmatch(tostring(GUIPermsTextBox.Text), "[^\r\n]+") do
-            if string.find(line, "All") then table.insert(permissionLines, "   - " .. PermStr) added = true end
+            if string.find(line, tostring(TextManager.Get("clientpermission.all"))) then table.insert(permissionLines, "   - " .. PermLocStr.Value) added = true end
             table.insert(permissionLines, line)
         end
-        if not added then table.insert(permissionLines, "   - " .. PermStr) end
+        if not added then table.insert(permissionLines, "   - " .. PermLocStr.Value) end
 
         GUIPermsTextBox.Text = table.concat(permissionLines, "\n")
         GUImsgBox.RectTransform.RecalculateChildren(true,true)
@@ -281,8 +283,9 @@ if CLIENT then
         --local targetclient = Game.NetLobbyScreen.PlayerFrame.UserData
         local targetclient = ptable["selectedClient"]
         if targetclient == nil then return end
-        ChangeWiringTickBox = GUI.TickBox(GUI.RectTransform(Vector2(0.15, 0.15), GUIpermissionsList.Content.RectTransform), PermStr, GUI.Style.SmallFont)
+        ChangeWiringTickBox = GUI.TickBox(GUI.RectTransform(Vector2(0.15, 0.15), GUIpermissionsList.Content.RectTransform), PermLocStr, GUI.Style.SmallFont)
         ChangeWiringTickBox.UserData = "ChangeWiring"
+        ChangeWiringTickBox.ToolTip = PermDescriptionLocStr
         ChangeWiringTickBox.Selected = AccountsWithCustomPermission[tostring(targetclient.AccountId)] ~= nil
         ChangeWiringTickBox.Selected = ChangeWiringTickBox.Selected or targetclient.HasPermission(ClientPermissions.All)
         --print(targetclient.SessionId, " = ", Game.Client.SessionId)
