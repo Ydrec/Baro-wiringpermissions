@@ -38,7 +38,7 @@ AccountsWithCustomPermission = {
 
 
 --All of these lines are for console so no localization for them
-local NoAccessStr = "You do not have rewiring permissions"
+local NoAccessStr = "You do not have wiring permissions"
 local GivePermissionStr = "Granted ChangeWiring permissions to "
 --local GivePermissionAllStr = "Granted All permissions to "
 local RevokePermissionStr = "Revoked ChangeWiring permissions from "
@@ -208,8 +208,8 @@ if CLIENT then
 
     Hook.Patch("WiringPerms_permsannouncement", 'Barotrauma.Networking.GameClient', 'SetMyPermissions', function(instance, ptable)
         if not Game.Client or not Game.Client.MyClient then return end
-        if not AccountsWithCustomPermission[tostring(Game.Client.MyClient.AccountId)] then return end
-        GUImsgBox = nil
+        if not (Game.Client.MyClient.HasPermission(ClientPermissions.All) or AccountsWithCustomPermission[tostring(Game.Client.MyClient.AccountId)]) then return end
+        local GUImsgBox = nil
         for msgBox in GUI.MessageBox.MessageBoxes do
             if tostring(msgBox.UserData) and tostring(msgBox.UserData) == "permissions" then
                 GUImsgBox = msgBox
@@ -275,18 +275,21 @@ if CLIENT then
 
     Hook.Patch("WiringPerms_managepermsmenu", 'Barotrauma.NetLobbyScreen', 'SelectPlayer', {"Barotrauma.Networking.Client"}, function(instance, ptable)
         if not instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(4)) then return end
-            local GUIpermissionsList = instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(4)).GetChild(Int32(0)).GetChild(Int32(1))
-            local GUIrankDropDown = instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(2))
+        local GUIpermissionsList = instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(4)).GetChild(Int32(0)).GetChild(Int32(1))
+        local GUIrankDropDown = instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(2))
 
-            local targetclient = Game.NetLobbyScreen.PlayerFrame.UserData
-            ChangeWiringTickBox = GUI.TickBox(GUI.RectTransform(Vector2(0.15, 0.15), GUIpermissionsList.Content.RectTransform), PermStr, GUI.Style.SmallFont)
-            ChangeWiringTickBox.UserData = "ChangeWiring"
-            ChangeWiringTickBox.Selected = AccountsWithCustomPermission[tostring(ptable["selectedClient"].AccountId)] ~= nil
-            ChangeWiringTickBox.Selected = ChangeWiringTickBox.Selected or client.HasPermission(ClientPermissions.All)
-            ChangeWiringTickBox.Enabled = ptable["selectedClient"].SessionId ~= Game.Client.SessionId --not your own client
-            ChangeWiringTickBox.OnSelected = function()
+        --local targetclient = Game.NetLobbyScreen.PlayerFrame.UserData
+        local targetclient = ptable["selectedClient"]
+        if targetclient == nil then return end
+        ChangeWiringTickBox = GUI.TickBox(GUI.RectTransform(Vector2(0.15, 0.15), GUIpermissionsList.Content.RectTransform), PermStr, GUI.Style.SmallFont)
+        ChangeWiringTickBox.UserData = "ChangeWiring"
+        ChangeWiringTickBox.Selected = AccountsWithCustomPermission[tostring(targetclient.AccountId)] ~= nil
+        ChangeWiringTickBox.Selected = ChangeWiringTickBox.Selected or targetclient.HasPermission(ClientPermissions.All)
+        --print(targetclient.SessionId, " = ", Game.Client.SessionId)
+        ChangeWiringTickBox.Enabled = targetclient.SessionId ~= Game.Client.SessionId --cant change perms for your own client
+        ChangeWiringTickBox.OnSelected = function()
             GUIrankDropDown.SelectItem(nil)
-            
+        
             if not targetclient or not LuaUserData.IsTargetType(targetclient, "Barotrauma.Networking.Client") then return false end
             if ChangeWiringTickBox.Selected then
                 AccountsWithCustomPermission[tostring(targetclient.AccountId)] = tostring(targetclient.Name)
@@ -317,7 +320,8 @@ if CLIENT then
             AccountsWithCustomPermission[accid] = nil
         end
 
-        if changed then
+        --print(tostring(Game.Client.MyClient.AccountId)," % ", accid)
+        if changed and tostring(Game.Client.MyClient.AccountId) == accid then
             --make game show new permissions message by faking a command as permissions themselves are immutable
             local augTable = {}
             for identifier in Game.Client.permittedConsoleCommands do
@@ -364,7 +368,8 @@ if SERVER then
         "System.Boolean"
     })
 
-
+    --explicit load in case of reloadlua
+    Game.ServerSettings.LoadClientPermissions()
 
     local function SendPermissionUpdate(targetclient, reciverclient)
         local msg = Networking.Start("WiringPerms_UpdatePermission")
@@ -669,16 +674,34 @@ local lastPicker = nil
     end, Hook.HookMethodType.Before)
 
 
+
     Hook.Patch("WiringPerms_saveperms", 'Barotrauma.Networking.ServerSettings', 'SaveClientPermissions', function(instance, ptable)
         if File.Exists(Game.ServerSettings.ClientPermissionsFile) then
             local PermissionsDoc = XDocument.Load(Game.ServerSettings.ClientPermissionsFile)
+            
+            for accid, name in pairs(AccountsWithCustomPermission) do
+                local clientElement = nil
+                for element in PermissionsDoc.Root.Elements() do
 
-            for clientElement in PermissionsDoc.Root.Elements() do
-                local accountid = clientElement.GetAttributeString("accountid")
-                local permissions = clientElement.GetAttributeString("permissions")
+                    if accid == element.GetAttributeString("accountid") then
+                        clientElement = element
+                        break
+                    end
+                end
 
-                if AccountsWithCustomPermission[accountid] then
-                    clientElement.SetAttributeValue("permissions", permissions .. ", " .. CustomPermission)
+                if clientElement then
+                    local permissions = clientElement.GetAttributeString("permissions")
+                    if not string.find(permissions, CustomPermission) then
+                        clientElement.SetAttributeValue("permissions", permissions .. ", " .. CustomPermission)
+                    end
+                else
+                    --if client has no other permissions they wouldnt have clientElement so we make one
+                    if name ~= nil then
+                        clientElement = XElement("Client", XAttribute("name", name))
+                        clientElement.Add(XAttribute("accountid", accid))
+                        clientElement.Add(XAttribute("permissions", CustomPermission))
+                        PermissionsDoc.Root.Add(clientElement)
+                    end
                 end
             end
 
@@ -686,6 +709,8 @@ local lastPicker = nil
         end
         return
     end, Hook.HookMethodType.After)
+
+
 
     Hook.Patch("WiringPerms_loadperms", 'Barotrauma.Networking.ServerSettings', 'LoadClientPermissions', function(instance, ptable)
         AccountsWithCustomPermission = {}
@@ -709,4 +734,12 @@ local lastPicker = nil
         end
         return
     end, Hook.HookMethodType.Before)
+
+
+
+    --Save current permissions in case lua unexpectedly stops aka reloadlua 
+    Hook.Add("stop", "WiringPerms_luastop", function ()
+        Game.ServerSettings.SaveClientPermissions()
+    end)
 end
+
