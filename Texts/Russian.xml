@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<infotexts language="Russian" nowhitespace="false" translatedname="Русский">
+	<Override>
+		<clientpermission.changewiring>Изменять проводку</clientpermission.changewiring>
+		<clientpermission.changewiring.description>Изменение проводки, отсоединение компонентов, изменение параметров компонентов или взаимодействие с Кабельной коробкой</clientpermission.changewiring.description>
+		<clientpermission.changewiring.noaccessmsg>У вас нет разрешения изменять проводку</clientpermission.changewiring.noaccessmsg>
+	</Override>
+</infotexts>

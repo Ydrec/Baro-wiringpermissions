@@ -2,5 +2,7 @@
 <infotexts language="English" nowhitespace="false" translatedname="English">
 	<Override>
 		<clientpermission.changewiring>Change wiring</clientpermission.changewiring>
+		<clientpermission.changewiring.description>Change wiring, deattach components, change component properties or interact with Circuit Box</clientpermission.changewiring.description>
+		<clientpermission.changewiring.noaccessmsg>You do not have wiring permissions</clientpermission.changewiring.noaccessmsg>
 	</Override>
 </infotexts>
