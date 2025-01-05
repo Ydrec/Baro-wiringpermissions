@@ -29,7 +29,7 @@ if Game.IsSingleplayer then return end
 local CustomPermission = "ChangeWiring"
 
 
-
+--example of how its formatted internally
 AccountsWithCustomPermission = {
     --["STEAM_1:1:76708553"] = "Ydrec"
 }
@@ -185,15 +185,24 @@ end
 
 
 
-local function printchildren(GUIComponent, extrastr)
-    extrastr = extrastr or ""
+local function printchildren(GUIComponent, indexstr)
+    indexstr = indexstr or ""
+    local i = 0
+    if indexstr == "3, 0, 4, 1, 1" then return end
     for child in GUIComponent.Children do
-        print(extrastr .. tostring(child))
+        local istr = ""
+        if indexstr == "" then
+            istr = tostring(i)
+        else
+            istr = indexstr .. ", " .. tostring(i)
+        end
+        print(istr, ": ", child)
         if LuaUserData.IsTargetType(child, "Barotrauma.GUITextBlock") then print(child.Text) end
         if child.Children ~= nil then
             --print("\\/\\/\\/")
-            printchildren(child, extrastr .. "##")
+            printchildren(child, istr)
         end
+        i = i + 1
     end
 end
 
@@ -293,10 +302,15 @@ if CLIENT then
         local GUIpermissionsList = instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(4)).GetChild(Int32(0)).GetChild(Int32(1))
         local GUIrankDropDown = instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(2))
 
-        --local targetclient = Game.NetLobbyScreen.PlayerFrame.UserData
+        -- local targetclient = Game.NetLobbyScreen.PlayerFrame.UserData
         local targetclient = ptable["selectedClient"]
         if targetclient == nil then return end
-        ChangeWiringTickBox = GUI.TickBox(GUI.RectTransform(Vector2(0.15, 0.15), GUIpermissionsList.Content.RectTransform), PermLocStr, GUI.Style.SmallFont)
+        -- printchildren(Game.NetLobbyScreen.PlayerFrame)
+        -- AllTickBox = instance.PlayerFrame.GetChild(Int32(3)).GetChild(Int32(0)).GetChild(Int32(4)).GetChild(Int32(0)).GetChild(Int32(0))
+        -- local AllOnSelected = AllTickBox.OnSelected
+        -- AllTickBox.OnSelected = function() AllOnSelected.Invoke(AllTickBox) end
+
+        local ChangeWiringTickBox = GUI.TickBox(GUI.RectTransform(Vector2(0.15, 0.15), GUIpermissionsList.Content.RectTransform), PermLocStr, GUI.Style.SmallFont)
         ChangeWiringTickBox.UserData = "ChangeWiring"
         ChangeWiringTickBox.ToolTip = PermDescriptionLocStr
         ChangeWiringTickBox.Selected = AccountsWithCustomPermission[tostring(targetclient.AccountId)] ~= nil
@@ -305,19 +319,22 @@ if CLIENT then
         ChangeWiringTickBox.Enabled = targetclient.SessionId ~= Game.Client.SessionId --cant change perms for your own client
         ChangeWiringTickBox.OnSelected = function()
             GUIrankDropDown.SelectItem(nil)
-        
-            if not targetclient or not LuaUserData.IsTargetType(targetclient, "Barotrauma.Networking.Client") then return false end
+            --local targetclient = Game.NetLobbyScreen.PlayerFrame.UserData
+            --if not targetclient or not LuaUserData.IsTargetType(targetclient, "Barotrauma.Networking.Client") then return false end
+
             if ChangeWiringTickBox.Selected then
                 AccountsWithCustomPermission[tostring(targetclient.AccountId)] = tostring(targetclient.Name)
             else
                 AccountsWithCustomPermission[tostring(targetclient.AccountId)] = nil
             end
 
+
+            local msg = Networking.Start("WiringPerms_UpdatePermission")
+            msg.WriteString(targetclient.AccountId)
+            msg.WriteBoolean(AccountsWithCustomPermission[tostring(targetclient.AccountId)] ~= nil)
+            Networking.Send(msg)
+
             if ChangeWiringTickBox.Enabled then
-                local msg = Networking.Start("WiringPerms_UpdatePermission")
-                msg.WriteString(targetclient.AccountId)
-                msg.WriteBoolean(AccountsWithCustomPermission[tostring(targetclient.AccountId)] ~= nil)
-                Networking.Send(msg)
                 Game.Client.UpdateClientPermissions(targetclient)
             end
             return true
