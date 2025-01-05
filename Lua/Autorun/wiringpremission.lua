@@ -459,12 +459,17 @@ if SERVER then
         local line = ptable["line"]
         --local lineindex = string.find(line, "set the permissions of the client "PlayerB" to ") or string.find(line, "removed all permissions")
         if string.find(line, "set the permissions") then
-            ptable["line"] = line .. ", " .. CustomPermission
-            --local newlogMsg = "Client \"" .. clientWho .. "\" set the permissions of the client \"" .. clientTo .. "\" to " .. "ALPHA"
-            --ptable["line"] = newlogMsg
+            local clientToName = string.match(line, "the client \"(.-)[%.-\"]")
+            local clientTo = FindClient(string.match(clientToName, "‖.-‖(.-)‖end‖"))
+            if clientTo and AccountsWithCustomPermission[tostring(clientTo.AccountId)] then
+                ptable["line"] = line .. ", " .. CustomPermission
+                --local newlogMsg = "Client \"" .. clientWho .. "\" set the permissions of the client \"" .. clientTo .. "\" to " .. "ALPHA"
+                --ptable["line"] = newlogMsg
+            end
         elseif string.find(line, "removed all permissions") then
-            local _, i, clientWhoName = string.find(line, "\"(.-)\"")
-            local _, _, clientToName = string.find(line, "\"(.-)[%.-\"]", i+1)
+            local clientToName = string.match(line, "the client \"(.-)[%.-\"]")
+            local clientWhoName = string.match(line, "Client \"(.-)\"")
+            
             --print(clientWhoName, ", ", clientToName)
             local clientTo = FindClient(string.match(clientToName, "‖.-‖(.-)‖end‖"))
             if clientTo and AccountsWithCustomPermission[tostring(clientTo.AccountId)] then
