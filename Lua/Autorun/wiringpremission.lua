@@ -83,7 +83,7 @@ local MessageCD = false
 local function HasWiringPerms(client)
     if AccountsWithCustomPermission[tostring(client.AccountId)] or client.HasPermission(ClientPermissions.All) then return true end
     --Sent back networking messages may cause false triggering so just wait them out
-    --This CD should be its own function tbh
+    --This message with CD should be its own function tbh
     if not MessageCD then
         Game.Server.SendDirectChatMessage(NoAccessMsg, client)
         MessageCD = true
@@ -94,6 +94,19 @@ local function HasWiringPerms(client)
     return false
 end
 
+
+
+--Allow wiring in wrecks and abandoned outposts. Mostly to allow deattaching stuff from walls and to fix beacons.
+local function IsItemInFriendlySub(item, character)
+    --print(item.Submarine.TeamID)
+    character = character or nil
+    if character and character.TeamID == item.Submarine.TeamID then
+        return true
+    elseif item.InPlayerSubmarine then
+        return true
+    end
+    return item.Submarine.TeamID == CharacterTeamType.FriendlyNPC
+end
 
 
 -- local LogMessageType = {
@@ -424,6 +437,27 @@ if SERVER then
         end
     end, Hook.HookMethodType.After)
 
+    Hook.Patch("WiringPerms_logpermissionchange", 'Barotrauma.Networking.GameServer', 'Log', function(instance, ptable)
+        if ptable["messageType"] ~= ServerLogMessageType.ServerMessage then return end
+        local line = ptable["line"]
+        --local lineindex = string.find(line, "set the permissions of the client "PlayerB" to ") or string.find(line, "removed all permissions")
+        if string.find(line, "set the permissions") then
+            ptable["line"] = line .. ", " .. CustomPermission
+            --local newlogMsg = "Client \"" .. clientWho .. "\" set the permissions of the client \"" .. clientTo .. "\" to " .. "ALPHA"
+            --ptable["line"] = newlogMsg
+        elseif string.find(line, "removed all permissions") then
+            local _, i, clientWhoName = string.find(line, "\"(.-)\"")
+            local _, _, clientToName = string.find(line, "\"(.-)[%.-\"]", i+1)
+            --print(clientWhoName, ", ", clientToName)
+            local clientTo = FindClient(string.match(clientToName, "‖.-‖(.-)‖end‖"))
+            if clientTo and AccountsWithCustomPermission[tostring(clientTo.AccountId)] then
+                local newlogMsg = "Client \"" .. clientWhoName .. "\" set the permissions of the client \"" .. clientToName .. "\" to " .. CustomPermission
+                ptable["line"] = newlogMsg
+            end
+        end
+
+    end, Hook.HookMethodType.Before)
+
 
 
     -- wire components break ChangePropertyEventData by having different amount of properties on client/server
@@ -468,11 +502,13 @@ if SERVER then
 
 
     Hook.Patch("WiringPerms_connectionpanel", 'Barotrauma.Items.Components.ConnectionPanel', 'ServerEventRead', function(instance, ptable)
-        if not HasWiringPerms(ptable["c"]) then
+        local client = ptable["c"]
+        if not IsItemInFriendlySub(instance.Item, client.Character) then return end
+        if not HasWiringPerms(client) then
             --zap(ptable["c"].Character)
-            deselect(ptable["c"].Character)
+            deselect(client.Character)
             ptable.PreventExecution = true
-            Game.Log(tostring(ptable["c"].Name) .. " attempted to change wiring in " .. tostring(instance.Item), ServerLogMessageType.Wiring)
+            Game.Log(tostring(client.Name) .. " attempted to change wiring in " .. tostring(instance.Item), ServerLogMessageType.Wiring)
         end
         return
     end, Hook.HookMethodType.Before)
@@ -508,6 +544,8 @@ if SERVER then
 
     local TemporarilyLocked = false
     Hook.Patch("WiringPerms_circuitbox_before", 'Barotrauma.Items.Components.CircuitBox', 'ServerEventRead', function(instance, ptable)
+        local client = ptable["c"]
+        if not IsItemInFriendlySub(instance.Item, client.Character) then return end
         local msg = ptable["msg"]
 
         --this seems to sometimes cause horrific crash idk why, sever doesnt even make crashlog and client crashlog is junk
@@ -517,13 +555,13 @@ if SERVER then
         --msg.BitPosition = bitpos
 
         if not TblContainsValue(AllowedOpcodes, WiringPerms_Opcode) then
-            if not HasWiringPerms(ptable["c"]) then
+            if not HasWiringPerms(client) then
                 instance.Item.NonInteractable = true
                 TemporarilyLocked = true
                 --zap(ptable["c"].Character)
-                deselect(ptable["c"].Character)
+                deselect(client.Character)
                 --ptable.PreventExecution = true
-                Game.Log(tostring(ptable["c"].Name) .. " attempted to " .. OpcodeStrings[WiringPerms_Opcode] .. " in " .. tostring(instance.Item), ServerLogMessageType.Wiring)
+                Game.Log(tostring(client.Name) .. " attempted to " .. OpcodeStrings[WiringPerms_Opcode] .. " in " .. tostring(instance.Item), ServerLogMessageType.Wiring)
             end
         end
         return
@@ -545,6 +583,7 @@ if SERVER then
         --if not attached and not contained in circuitbox skip
         --some items have toggles while holding/wearing
         if  item == nil then return end
+        if not IsItemInFriendlySub(item, client.Character) then return end
         if (item.GetComponent(Components.Pickable) and not item.GetComponent(Components.Pickable).IsAttached) and
             (item.Container and not item.Container.GetComponentString("CircuitBox"))
         then return end
@@ -571,7 +610,8 @@ local lastPicker = nil
     Hook.Patch("WiringPerms_deattach", 'Barotrauma.Items.Components.Pickable', 'Pick', function(instance, ptable)
         local picker = ptable["picker"]
         if not picker.IsPlayer then return end
-        if instance.IsAttached and instance.item.Prefab.Category == MapEntityCategory.Electrical then
+        if not IsItemInFriendlySub(instance.Item, picker) then return end
+        if instance.IsAttached and instance.Item.Prefab.Category == MapEntityCategory.Electrical then
             client = FindClient(picker.ID)
             if (not client) or (HasWiringPerms(client)) then return end
             instance.StopPicking(picker)
@@ -729,7 +769,14 @@ local lastPicker = nil
 
                     -- delete custom permissions from perms config file before game sees it 
                     -- or game gonna throw a fit and delete all permissions
-                    local newpermissionStr = string.gsub(permissions, ", " .. CustomPermission, "")
+                    local pattern = ""
+                    if string.find(permissions, "^" .. CustomPermission) then
+                        pattern =   CustomPermission .. ",?%s?"
+                    else
+                        pattern = ",?%s?" .. CustomPermission
+                    end
+                    local newpermissionStr = string.gsub(permissions, pattern, "")
+                    if newpermissionStr == "" then newpermissionStr = "None" end
                     clientElement.SetAttributeValue("permissions", newpermissionStr)
                 end
             end
