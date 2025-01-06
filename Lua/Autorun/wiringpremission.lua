@@ -169,8 +169,8 @@ end
 local function TblContainsStr(table, targetstr)
     for str in table do
         if tostring(str) == targetstr then return true end
-        return false
     end
+    return false
 end
 
 
