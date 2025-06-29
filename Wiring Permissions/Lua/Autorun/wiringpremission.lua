@@ -99,7 +99,7 @@ end
 --Allow wiring in wrecks and abandoned outposts. Mostly to allow deattaching stuff from walls and to fix beacons.
 local function IsItemInFriendlySub(item, character)
     --print(item.Submarine.TeamID)
-    if not item.Submarine then return false end
+    if not item or not item.Submarine then return false end
     character = character or nil
     if character and character.TeamID == item.Submarine.TeamID then
         return true
